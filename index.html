@@ -81,7 +81,7 @@
             color: #991B1B;
         }
         /* Custom styles for the confirmation modal */
-        .modal {
+        .edit-modal-backdrop {
             position: fixed;
             top: 0;
             left: 0;
@@ -93,12 +93,12 @@
             align-items: center;
             z-index: 1000;
         }
-        .modal-content {
+        .edit-modal {
             background-color: white;
             padding: 2rem;
-            border-radius: 0.75rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            text-align: center;
+            border-radius: 1rem;
+            width: 90%;
+            max-width: 600px;
         }
     </style>
 </head>
@@ -332,6 +332,38 @@
         </div>
         
     </div>
+    
+    <!-- Edit Modal -->
+    <div id="edit-modal-backdrop" class="edit-modal-backdrop hidden">
+        <div id="edit-modal" class="edit-modal">
+            <h2 class="text-2xl font-bold mb-4">Edit Item</h2>
+            <form id="edit-form">
+                <input type="hidden" id="edit-id">
+                <input type="hidden" id="edit-table">
+                <div class="form-group">
+                    <label for="edit-title" class="form-label">Title</label>
+                    <input type="text" id="edit-title" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="edit-content" class="form-label">Content</label>
+                    <textarea id="edit-content" class="form-input" rows="4"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="edit-image-file" class="form-label">Upload New Image</label>
+                    <input type="file" id="edit-image-file" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="edit-caption" class="form-label">Caption</label>
+                    <input type="text" id="edit-caption" class="form-input">
+                </div>
+                <div class="flex justify-end space-x-4">
+                    <button type="button" id="close-modal-btn" class="btn-primary bg-gray-500 hover:bg-gray-600">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 
     <!-- Login Section -->
     <div id="login-form" class="container max-w-sm">
@@ -468,6 +500,7 @@
              if (data) {
                  document.getElementById('about-content').value = data.content;
              }
+            list.addEventListener('click', handleDeleteAndEdit);
         }
 
         async function loadActivities() {
@@ -481,15 +514,16 @@
                     el.innerHTML = `
                         <p>${item.title}</p>
                         <div>
-                            <button class="edit-btn text-blue-500 mr-2" data-id="${item.id}" data-table="activities">Edit</button>
+                            <button class="edit-btn text-blue-500 mr-2" data-id="${item.id}" data-table="activities" data-title="${item.title}" data-content="${item.content}">Edit</button>
                             <button class="delete-btn text-red-500" data-id="${item.id}" data-table="activities">Delete</button>
                         </div>
                     `;
                     list.appendChild(el);
                 });
             }
+            list.addEventListener('click', handleDeleteAndEdit);
         }
-
+        
         async function loadNotices() {
             const { data, error } = await supabase.from('notices').select('*');
             const list = document.getElementById('notices-list');
@@ -508,6 +542,7 @@
                     list.appendChild(el);
                 });
             }
+            list.addEventListener('click', handleDeleteAndEdit);
         }
 
         async function loadCauses() {
@@ -528,6 +563,7 @@
                     list.appendChild(el);
                 });
             }
+            list.addEventListener('click', handleDeleteAndEdit);
         }
 
         async function loadNews() {
@@ -548,6 +584,7 @@
                     list.appendChild(el);
                 });
             }
+            list.addEventListener('click', handleDeleteAndEdit);
         }
         
         async function loadGallery() {
@@ -571,6 +608,7 @@
             } else {
                 list.innerHTML = '<p class="text-center text-gray-500">No images in gallery.</p>';
             }
+            list.addEventListener('click', handleDeleteAndEdit);
         }
         
         async function loadInternshipContent() {
@@ -592,6 +630,7 @@
                     list.appendChild(el);
                 });
             }
+            list.addEventListener('click', handleDeleteAndEdit);
         }
 
         async function loadBranches() {
@@ -612,6 +651,7 @@
                     list.appendChild(el);
                 });
             }
+            list.addEventListener('click', handleDeleteAndEdit);
         }
 
         async function loadAchievements() {
@@ -633,6 +673,7 @@
                     list.appendChild(el);
                 });
             }
+            list.addEventListener('click', handleDeleteAndEdit);
         }
         
         async function loadInternshipFormUrl() {
@@ -640,6 +681,7 @@
             if (data) {
                 document.getElementById('internship-form-url').value = data.url;
             }
+            list.addEventListener('click', handleDeleteAndEdit);
         }
 
         document.addEventListener('click', (e) => {
@@ -662,6 +704,94 @@
                 // This is a simplified example. A full implementation would involve
                 // populating a modal or form with the existing data for editing.
                 alert(`Edit functionality for item ${id} in table ${table} is not yet fully implemented.`);
+            }
+            list.addEventListener('click', handleDeleteAndEdit);
+        });
+
+        async function handleDeleteAndEdit(e) {
+            const btn = e.target;
+            const id = btn.dataset.id;
+            const table = btn.dataset.table;
+
+            if (btn.classList.contains('delete-btn')) {
+                if (confirm(`Are you sure you want to delete this item from ${table}?`)) {
+                    const { error } = await supabase.from(table).delete().eq('id', id);
+                    if (error) {
+                        showMessage(document.getElementById('login-message'), `Error deleting item from ${table}.`, "error");
+                        console.error(error);
+                    } else {
+                        showMessage(document.getElementById('login-message'), `Item deleted from ${table}.`, "success");
+                        loadAllData();
+                    }
+                }
+            } else if (btn.classList.contains('edit-btn')) {
+                const itemData = {};
+                for (const key in btn.dataset) {
+                    if (key !== 'id' && key !== 'table' && key !== 'imageurl') {
+                        itemData[key] = btn.dataset[key];
+                    }
+                }
+                openEditModal(id, table, itemData);
+            }
+        }
+
+        // Edit Modal functions
+        function openEditModal(id, table, data) {
+            const modalBackdrop = document.getElementById('edit-modal-backdrop');
+            modalBackdrop.classList.remove('hidden');
+            
+            document.getElementById('edit-id').value = id;
+            document.getElementById('edit-table').value = table;
+            
+            // Populate form fields based on the table
+            document.getElementById('edit-title').value = data.title || '';
+            document.getElementById('edit-content').value = data.content || '';
+            document.getElementById('edit-caption').value = data.caption || '';
+            
+            // Show/hide fields based on table
+            if (table === 'news' || table === 'activities' || table === 'notices') {
+                document.getElementById('edit-title').parentElement.classList.remove('hidden');
+                document.getElementById('edit-content').parentElement.classList.remove('hidden');
+            } else {
+                document.getElementById('edit-title').parentElement.classList.add('hidden');
+                document.getElementById('edit-content').parentElement.classList.add('hidden');
+            }
+            if (table === 'news' || table === 'achievements' || table === 'gallery') {
+                 document.getElementById('edit-caption').parentElement.classList.remove('hidden');
+            } else {
+                 document.getElementById('edit-caption').parentElement.classList.add('hidden');
+            }
+        }
+        
+        function closeEditModal() {
+            document.getElementById('edit-modal-backdrop').classList.add('hidden');
+            document.getElementById('edit-form').reset();
+        }
+
+        document.getElementById('close-modal-btn').addEventListener('click', closeEditModal);
+
+        document.getElementById('edit-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('edit-id').value;
+            const table = document.getElementById('edit-table').value;
+            const newTitle = document.getElementById('edit-title').value;
+            const newContent = document.getElementById('edit-content').value;
+            const newCaption = document.getElementById('edit-caption').value;
+            
+            const updates = {};
+            if (newTitle) updates.title = newTitle;
+            if (newContent) updates.content = newContent;
+            if (newCaption) updates.caption = newCaption;
+
+            try {
+                const { error } = await supabase.from(table).update(updates).eq('id', id);
+                if (error) throw error;
+                showMessage(document.getElementById('login-message'), `Item updated successfully in ${table}!`, "success");
+                closeEditModal();
+                loadAllData();
+            } catch (e) {
+                console.error("Error updating item: ", e);
+                showMessage(document.getElementById('login-message'), "Error updating item.", "error");
             }
         });
         
@@ -1002,4 +1132,5 @@
     </script>
 </body>
 </html>
+
 
